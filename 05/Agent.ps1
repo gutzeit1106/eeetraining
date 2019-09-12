@@ -1,5 +1,5 @@
 $APIHost= "khiraha10:8090"
-$MaxRetry = 2
+$MaxRetry = 4
 $MaxTimeoutSec = 15
 
 # �N���X��`
@@ -83,6 +83,7 @@ class Agent
             $this.api_call += 1
             $this.finalStatusCode = $r.StatusCode
             $this.finalstatusDescription = ""
+
        }elseif ($r.StatusCode -in @('404')){
             $this.state = $r.state
             $this.final_move = $r.final_move
@@ -110,40 +111,37 @@ function APIRequest([String] $URI, [String] $Method){
     #Write-Host $date.ToString()", $URI, $Method"
     while($true){
         try {
+            $try += -1
+            $result = $null
             $full_uri = "http://$($script:APIHost)/$URI"
             $r = Invoke-RestMethod -Method $Method -Uri $full_uri -TimeoutSec $script:MaxTimeoutSec
             $result = FormatObject '200' $null $r
-            $date.ToString() + ", $full_uri, $Method, 200, $r" >> ./log.txt
-            #Write-Host "StatusCode:200"
+            $date.ToString() + ", $full_uri, $Method, 200, $r" >> ./success.log
+            $date.ToString() + ", $full_uri, $Method, 200, $r" >> ./apicall.log
             break
 
         }catch{  
-            $date.ToString() + ", $full_uri, $Method," + $_.Exception   >> ./log.txt
-            #Write-Host "StatusCode:" $_.Exception
-            #Write-Host "StatusCode:" $_.Exception.Response.StatusCode.value__
-            #Write-Host "StatusDescription:" $_.Exception.Response.StatusDescription]
-
+            $date.ToString() + ", $full_uri, $Method," + $_.Exception   >> ./err.log
+            $date.ToString() + ", $full_uri, $Method," + $_.Exception   >> ./apicall.log
             if($URI.Contains("move")){
                 if($_.Exception.Response.StatusCode.value__ -in @("404", "500")){
-
                     $result = FormatObject $_.Exception.Response.StatusCode.value__ $_.Exception.Response.StatusDescription $null
                     return $result
                 }
             }
+
             #client error
             if($_.Exception.Response.StatusCode.value__ -in @("400,401,402,403,404,405")){
                     $result = FormatObject $_.Exception.Response.StatusCode.value__ $_.Exception.Response.StatusDescription $null
-                    return $result
             }
 
             #server error
             if($_.Exception.Response.StatusCode.value__ -in @("500,501,502,503,505")){
                     $result = FormatObject $_.Exception.Response.StatusCode.value__ $_.Exception.Response.StatusDescription $null
-                    return $result
             }
         }
-        $try += -1;
-        if($try -lt 1){break;}
+        
+        if($try -lt 1){break}
     }  
     return $result
 }
